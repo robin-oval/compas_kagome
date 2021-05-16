@@ -49,7 +49,8 @@ class Kagome(Mesh):
 			singular_hex = all([len(self.face_vertices(nbr)) == 3 for nbr in self.face_neighbors(fkey)]) and len(self.face_vertices(fkey)) != 6
 			singular_tri = all([len(self.face_vertices(nbr)) == 6 for nbr in self.face_neighbors(fkey)]) and len(self.face_vertices(fkey)) != 3
 			if singular_hex or singular_tri:
-				singular_faces.append([self.vertex_coordinates(vkey) for vkey in self.face_vertices(fkey) + self.face_vertices(fkey)[: 1]])
+				singular_faces.append(fkey)
+				#singular_faces.append([self.vertex_coordinates(vkey) for vkey in self.face_vertices(fkey) + self.face_vertices(fkey)[: 1]])
 		return singular_faces
 
 	def negative_singularities(self):
