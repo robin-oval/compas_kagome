@@ -2,12 +2,9 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
 
-from compas.datastructures import Mesh
+from compas.datastructures import Mesh, Network
 
-from compas.geometry import subtract_vectors
-from compas.geometry import normalize_vector
-from compas.geometry import scale_vector
-from compas.geometry import cross_vectors
+from compas.geometry import subtract_vectors, normalize_vector, scale_vector, cross_vectors, centroid_points
 
 from compas.datastructures import trimesh_subdivide_loop
 
@@ -37,6 +34,12 @@ class Kagome(Mesh):
 		vertices, faces = mesh_conway_ambo(dense_mesh).to_vertices_and_faces()
 		return cls.from_vertices_and_faces(vertices, faces)
 
+	def hex_faces(self):
+		return [fkey for fkey in self.faces() if len(self.face_vertices(fkey)) == 6]
+
+	def tri_faces(self):
+		return [fkey for fkey in self.faces() if len(self.face_vertices(fkey)) == 3]
+
 	### singularities ###
 
 	def store_polyedge_data(self):
@@ -64,21 +67,22 @@ class Kagome(Mesh):
 	### polyedges ###
 
 	def vertex_opposite_vertex(self, u, v):
-
-		if self.is_edge_on_boundary(u, v):
-			
-			if self.vertex_degree(v) == 2:
-				return None
-			
-			else:
-				return [nbr for nbr in self.vertex_neighbors(v, ordered = True) if nbr != u and self.is_edge_on_boundary(v, nbr)][0]
 		
-		elif self.is_vertex_on_boundary(v):
+		nbrs = self.vertex_neighbors(v, ordered = True)
+
+		if len(nbrs) == 4:
+			return nbrs[nbrs.index(u) - 2]
+
+		if len(nbrs) == 2:
 			return None
 
-		else:
-			nbrs = self.vertex_neighbors(v, ordered = True)
-			return nbrs[nbrs.index(u) - 2]
+		if len(nbrs) == 3:
+			if self.is_edge_on_boundary(u, v):
+				for nbr in nbrs:
+					if nbr != u and self.is_edge_on_boundary(v, nbr):
+						return nbr
+			else:
+				return None
 
 	def polyedge(self, u0, v0):
 
@@ -184,6 +188,29 @@ class Kagome(Mesh):
 
 		return polyedge_weave
 
+		polyedges = kagome.polyedge_data
+
+	def polyedge_graph(self):
+
+		polyedges = self.polyedge_data
+
+		edge_to_polyedge_index = {vkey: {} for vkey in self.vertices()}
+		for i, polyedge in enumerate(polyedges):
+			for u, v in pairwise(polyedge):
+				edge_to_polyedge_index[u][v] = i
+				edge_to_polyedge_index[v][u] = i
+
+		vertices = [centroid_points([self.vertex_coordinates(vkey) for vkey in polyedge]) for polyedge in polyedges]
+
+		edges = []
+		for idx, polyedge in enumerate(polyedges):
+			for vkey in polyedge:
+				for vkey_2 in self.vertex_neighbors(vkey):
+					idx_2 = edge_to_polyedge_index[vkey][vkey_2]
+					if idx_2 != idx and idx < idx_2 and (idx, idx_2) not in edges:
+						edges.append((idx, idx_2))
+
+		return Network.from_nodes_and_edges(vertices, edges)
 
 # ==============================================================================
 # Main
